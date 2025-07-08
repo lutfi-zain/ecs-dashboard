@@ -138,19 +138,27 @@ npm install
 yarn install
 ```
 
-### 3. Environment Configuration
+### 3. AWS Authentication (Choose One Method)
 
+The application supports multiple authentication methods:
+
+#### Option A: AWS CLI (Recommended)
+If you have AWS CLI configured, no additional setup needed:
+```bash
+aws configure
+```
+
+#### Option B: Environment Variables
 Create a `.env.local` file in the root directory:
-
 ```env
-# AWS Configuration
+# AWS Configuration (Optional if using AWS CLI)
 AWS_ACCESS_KEY_ID=your_aws_access_key_id
 AWS_SECRET_ACCESS_KEY=your_aws_secret_access_key
-AWS_REGION=ap-southeast-3
-
-# Optional: Custom cluster names (comma-separated)
-ECS_CLUSTER_NAMES=kairos-pay-cluster-ecs-iac,kairos-his-cluster-ecs-iac,kairos-pas-cluster-ecs-iac
+AWS_REGION=ap-southeast-1
 ```
+
+#### Option C: IAM Roles
+When running on AWS infrastructure, IAM roles will be used automatically.
 
 ### 4. Start Development Server
 
@@ -170,10 +178,20 @@ The application will be available at `http://localhost:3000`
 
 | Variable | Description | Required | Default |
 |----------|-------------|----------|---------|
-| `AWS_ACCESS_KEY_ID` | AWS access key ID | ✅ | - |
-| `AWS_SECRET_ACCESS_KEY` | AWS secret access key | ✅ | - |
-| `AWS_REGION` | AWS region | ✅ | `ap-southeast-3` |
-| `ECS_CLUSTER_NAMES` | Comma-separated cluster names | ❌ | Predefined clusters |
+| `AWS_ACCESS_KEY_ID` | AWS access key ID | ❌* | Uses credential chain |
+| `AWS_SECRET_ACCESS_KEY` | AWS secret access key | ❌* | Uses credential chain |
+| `AWS_REGION` | AWS region | ❌ | `ap-southeast-1` |
+
+*Only required if not using AWS CLI or IAM roles
+
+### AWS Credential Chain
+
+The application follows AWS SDK credential precedence:
+1. **Environment Variables** - `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`
+2. **AWS CLI** - `~/.aws/credentials` and `~/.aws/config`
+3. **IAM Roles** - When running on AWS infrastructure
+4. **Instance Profiles** - For EC2 instances
+5. **Container Credentials** - For ECS tasks
 
 ### Cluster Configuration
 
@@ -379,9 +397,10 @@ Please use the [GitHub Issues](https://github.com/lutfi-zain/ecs-dashboard/issue
 **Error**: `AWS credentials not configured properly`
 
 **Solution**:
-- Verify `.env.local` file exists with correct credentials
-- Check AWS CLI configuration: `aws configure list`
-- Ensure IAM permissions are correctly set
+- **Using AWS CLI**: Run `aws configure` to set up credentials
+- **Using Environment Variables**: Verify `.env.local` file exists with correct credentials
+- **Check Configuration**: Run `aws configure list` to verify current setup
+- **Verify Permissions**: Ensure IAM user/role has required ECS permissions
 
 #### 2. Cluster Not Found
 **Error**: `Cluster not found in region`

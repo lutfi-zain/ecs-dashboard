@@ -10,6 +10,8 @@
   },
   "dependencies": {
     "@aws-sdk/client-ecs": "latest",
+    "@aws-sdk/credential-providers": "^3.840.0",
+    "@aws-sdk/shared-ini-file-loader": "^3.370.0",
     "@hookform/resolvers": "^3.9.1",
     "@radix-ui/react-accordion": "1.2.2",
     "@radix-ui/react-alert-dialog": "1.1.4",

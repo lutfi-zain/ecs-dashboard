@@ -1,36 +1,43 @@
 import { ECSClient } from "@aws-sdk/client-ecs"
+import { fromIni } from "@aws-sdk/credential-providers"
 
-// AWS Configuration with credential validation
-const validateAWSCredentials = () => {
-  const requiredEnvVars = {
-    AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID,
-    AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY,
-    AWS_REGION: process.env.AWS_REGION,
+// AWS Configuration with flexible credential handling
+export const getAWSConfig = () => {
+  // Try to get region from environment variables first
+  const region = process.env.AWS_REGION || 
+                process.env.AWS_DEFAULT_REGION || 
+                "ap-southeast-3" // Use your AWS CLI region as default
+  
+  // Check if explicit credentials are provided via environment variables
+  const hasExplicitCredentials = 
+    process.env.AWS_ACCESS_KEY_ID && 
+    process.env.AWS_SECRET_ACCESS_KEY
+
+  if (hasExplicitCredentials) {
+    // Use explicit credentials
+    console.log(`Using explicit credentials (region: ${region})`)
+    return {
+      region,
+      credentials: {
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+      },
+    }
+  } else {
+    // Use AWS credential chain (AWS CLI, IAM roles, etc.)
+    console.log(`Using AWS credential chain (region: ${region})`)
+    return {
+      region,
+      credentials: fromIni(), // Use AWS CLI credentials
+    }
   }
-
-  const missingVars = Object.entries(requiredEnvVars)
-    .filter(([_, value]) => !value)
-    .map(([key, _]) => key)
-
-  if (missingVars.length > 0) {
-    throw new Error(`Missing required AWS environment variables: ${missingVars.join(", ")}`)
-  }
-
-  return requiredEnvVars as Record<string, string>
 }
 
-// Create ECS client with explicit credentials
+// Create ECS client with flexible credential handling
 export const createECSClient = () => {
   try {
-    const credentials = validateAWSCredentials()
-
-    return new ECSClient({
-      region: credentials.AWS_REGION,
-      credentials: {
-        accessKeyId: credentials.AWS_ACCESS_KEY_ID,
-        secretAccessKey: credentials.AWS_SECRET_ACCESS_KEY,
-      },
-    })
+    const config = getAWSConfig()
+    return new ECSClient(config)
   } catch (error) {
     console.error("Failed to create ECS client:", error)
     throw error
@@ -46,10 +53,12 @@ export const testAWSConnection = async () => {
     // Test with a simple describe clusters call
     await client.send(new DescribeClustersCommand({}))
 
+    const config = getAWSConfig()
     return {
       success: true,
       message: "AWS connection successful",
-      region: process.env.AWS_REGION,
+      region: config.region,
+      credentialSource: config.credentials ? "Environment Variables" : "AWS Credential Chain (CLI/IAM)",
     }
   } catch (error) {
     console.error("AWS connection test failed:", error)
@@ -59,10 +68,12 @@ export const testAWSConnection = async () => {
       errorMessage = error.message
     }
 
+    const config = getAWSConfig()
     return {
       success: false,
       message: errorMessage,
-      region: process.env.AWS_REGION,
+      region: config.region,
+      credentialSource: config.credentials ? "Environment Variables" : "AWS Credential Chain (CLI/IAM)",
     }
   }
 }
