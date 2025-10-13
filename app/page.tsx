@@ -19,6 +19,7 @@ import {
   Loader2,
   Wifi,
   WifiOff,
+  Terminal,
 } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 
@@ -72,6 +73,7 @@ export default function ECSStatusDashboard() {
   const [updateResults, setUpdateResults] = useState<UpdateResult[]>([])
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [awsHealth, setAwsHealth] = useState<AWSHealthStatus | null>(null)
+  const [statusFilter, setStatusFilter] = useState<string | null>(null)
 
   const clusterNames = ["kairos-pay-cluster-ecs-iac", "kairos-his-cluster-ecs-iac", "kairos-pas-cluster-ecs-iac"]
 
@@ -110,6 +112,9 @@ export default function ECSStatusDashboard() {
       if (!selectedCluster && data.length > 0) {
         setSelectedCluster(data[0].clusterName)
       }
+      
+      // Clear filter when data refreshes
+      setStatusFilter(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred")
     } finally {
@@ -164,6 +169,11 @@ export default function ECSStatusDashboard() {
     fetchECSStatus()
   }, [])
 
+  // Clear selection when cluster changes manually (not via metric click)
+  useEffect(() => {
+    setSelectedServices(new Set())
+  }, [selectedCluster])
+
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
       case "active":
@@ -210,9 +220,170 @@ export default function ECSStatusDashboard() {
 
   const handleSelectAll = (checked: boolean) => {
     if (checked && selectedClusterData) {
-      setSelectedServices(new Set(selectedClusterData.services.map((s) => s.serviceName)))
+      const filteredServices = getFilteredServices()
+      setSelectedServices(new Set(filteredServices.map((s) => s.serviceName)))
     } else {
       setSelectedServices(new Set())
+    }
+  }
+
+  const handleMetricClick = (clusterName: string, filterType: string) => {
+    // If clicking the same cluster, just update filter without triggering useEffect
+    if (selectedCluster === clusterName) {
+      setStatusFilter(filterType)
+    } else {
+      setSelectedCluster(clusterName)
+      setStatusFilter(filterType)
+    }
+    setSelectedServices(new Set()) // Clear selected services when filtering
+  }
+
+  const getFilteredServices = () => {
+    if (!selectedClusterData) return []
+    
+    let services = selectedClusterData.services
+    
+    if (statusFilter === 'running') {
+      services = services.filter(service => service.runningCount > 0)
+    } else if (statusFilter === 'pending') {
+      services = services.filter(service => service.pendingCount > 0)
+    } else if (statusFilter === 'services') {
+      // Show all services (no additional filtering)
+      services = selectedClusterData.services
+    }
+    
+    return services
+  }
+
+  const clearFilter = () => {
+    setStatusFilter(null)
+  }
+
+  const handleConnectShell = async (serviceName: string, clusterName: string) => {
+    try {
+      const region = 'ap-southeast-3' // Based on the region mentioned in the UI
+      
+      // Create a comprehensive batch file with error handling
+      const batchCommands = [
+        '@echo off',
+        'title ECS Shell Connection - ' + serviceName,
+        'color 0A',
+        'echo ====================================================',
+        'echo           AWS ECS Shell Connection Tool',
+        'echo ====================================================',
+        'echo.',
+        'echo Service: ' + serviceName,
+        'echo Cluster: ' + clusterName,
+        'echo Region: ' + region,
+        'echo.',
+        'echo Checking AWS CLI installation...',
+        'aws --version >nul 2>&1',
+        'if errorlevel 1 (',
+        '    echo ERROR: AWS CLI is not installed or not in PATH',
+        '    echo Please install AWS CLI v2 and try again',
+        '    pause',
+        '    exit /b 1',
+        ')',
+        'echo AWS CLI found!',
+        'echo.',
+        'echo Checking AWS credentials...',
+        'aws sts get-caller-identity >nul 2>&1',
+        'if errorlevel 1 (',
+        '    echo ERROR: AWS credentials not configured',
+        '    echo Please run "aws configure" first',
+        '    pause',
+        '    exit /b 1',
+        ')',
+        'echo AWS credentials OK!',
+        'echo.',
+        'echo Fetching running tasks for service ' + serviceName + '...',
+        `aws ecs list-tasks --cluster ${clusterName} --service-name ${serviceName} --region ${region} --desired-status RUNNING --query "taskArns[0]" --output text > temp_task.txt 2>nul`,
+        'if errorlevel 1 (',
+        '    echo ERROR: Failed to fetch tasks',
+        '    echo Make sure the service exists and you have proper permissions',
+        '    pause',
+        '    exit /b 1',
+        ')',
+        'set /p TASK_ARN=<temp_task.txt',
+        'if "%TASK_ARN%"=="None" (',
+        '    echo ERROR: No running tasks found for this service',
+        '    echo The service may be stopped or still starting',
+        '    del temp_task.txt 2>nul',
+        '    pause',
+        '    exit /b 1',
+        ')',
+        'echo Task ARN: %TASK_ARN%',
+        'echo.',
+        'echo Getting container information...',
+        `aws ecs describe-tasks --cluster ${clusterName} --region ${region} --tasks %TASK_ARN% --query "tasks[0].containers[0].name" --output text > temp_container.txt 2>nul`,
+        'if errorlevel 1 (',
+        '    echo ERROR: Failed to get container details',
+        '    del temp_task.txt 2>nul',
+        '    pause',
+        '    exit /b 1',
+        ')',
+        'set /p CONTAINER_NAME=<temp_container.txt',
+        'echo Container: %CONTAINER_NAME%',
+        'echo.',
+        'echo Checking if ECS Exec is enabled...',
+        `aws ecs describe-tasks --cluster ${clusterName} --region ${region} --tasks %TASK_ARN% --query "tasks[0].enableExecuteCommand" --output text > temp_exec.txt 2>nul`,
+        'set /p EXEC_ENABLED=<temp_exec.txt',
+        'if "%EXEC_ENABLED%"=="false" (',
+        '    echo WARNING: ECS Exec is not enabled for this task',
+        '    echo The service needs to be created/updated with enableExecuteCommand=true',
+        '    echo Connection may fail...',
+        '    echo.',
+        ')',
+        'echo ====================================================',
+        'echo Connecting to container...',
+        'echo Press Ctrl+C to disconnect when done',
+        'echo ====================================================',
+        'echo.',
+        `aws ecs execute-command --cluster ${clusterName} --task %TASK_ARN% --container %CONTAINER_NAME% --interactive --command "/bin/bash" --region ${region}`,
+        'if errorlevel 1 (',
+        '    echo.',
+        '    echo Connection failed. Trying with /bin/sh instead...',
+        `    aws ecs execute-command --cluster ${clusterName} --task %TASK_ARN% --container %CONTAINER_NAME% --interactive --command "/bin/sh" --region ${region}`,
+        ')',
+        'echo.',
+        'echo Connection closed.',
+        'echo Cleaning up temporary files...',
+        'del temp_task.txt temp_container.txt temp_exec.txt 2>nul',
+        'echo Done.',
+        'pause'
+      ].join('\r\n')
+
+      // Create and download the batch file
+      const blob = new Blob([batchCommands], { type: 'text/plain' })
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `ecs-shell-${serviceName}-${Date.now()}.bat`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+      
+      // Show instruction modal/alert
+      const message = `📥 Shell connection script downloaded!
+
+🔧 Prerequisites:
+• AWS CLI v2 installed
+• AWS credentials configured (aws configure)
+• ECS Execute Command enabled for the service
+
+📋 Instructions:
+1. Run the downloaded .bat file
+2. The script will automatically connect you to the container
+3. Use Ctrl+C to disconnect when done
+
+⚠️ Note: If connection fails, the service may need ECS Exec enabled.`
+
+      alert(message)
+      
+    } catch (err) {
+      console.error('Error creating shell connection:', err)
+      alert('❌ Error creating shell connection script. Please try again.')
     }
   }
 
@@ -323,15 +494,33 @@ export default function ECSStatusDashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-3 gap-4">
-                    <div className="text-center">
+                    <div 
+                      className="text-center cursor-pointer hover:bg-blue-50 rounded p-2 transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleMetricClick(cluster.clusterName, 'services')
+                      }}
+                    >
                       <div className="text-xl font-bold text-blue-600">{cluster.activeServicesCount}</div>
                       <div className="text-xs text-gray-600">Services</div>
                     </div>
-                    <div className="text-center">
+                    <div 
+                      className="text-center cursor-pointer hover:bg-green-50 rounded p-2 transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleMetricClick(cluster.clusterName, 'running')
+                      }}
+                    >
                       <div className="text-xl font-bold text-green-600">{cluster.runningTasksCount}</div>
                       <div className="text-xs text-gray-600">Running</div>
                     </div>
-                    <div className="text-center">
+                    <div 
+                      className="text-center cursor-pointer hover:bg-yellow-50 rounded p-2 transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleMetricClick(cluster.clusterName, 'pending')
+                      }}
+                    >
                       <div className="text-xl font-bold text-yellow-600">{cluster.pendingTasksCount}</div>
                       <div className="text-xs text-gray-600">Pending</div>
                     </div>
@@ -348,13 +537,39 @@ export default function ECSStatusDashboard() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle>Service Management</CardTitle>
+                  <CardTitle className="flex items-center gap-2">
+                    Service Management
+                    {statusFilter && (
+                      <Badge variant="secondary" className="capitalize">
+                        Filtered by: {statusFilter}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-4 w-4 p-0 ml-1 hover:bg-transparent"
+                          onClick={clearFilter}
+                        >
+                          ×
+                        </Button>
+                      </Badge>
+                    )}
+                  </CardTitle>
                   <CardDescription>
                     Select and manage services in your ECS cluster (Region: ap-southeast-3)
+                    {statusFilter && (
+                      <span className="block text-blue-600 mt-1">
+                        Showing services with {statusFilter === 'running' ? 'running tasks' : statusFilter === 'pending' ? 'pending tasks' : 'active status'}
+                      </span>
+                    )}
+                    <span className="block text-sm text-gray-500 mt-1">
+                      💡 Use the Shell button to download connection scripts for running services
+                    </span>
                   </CardDescription>
                 </div>
                 <div className="flex items-center gap-4">
-                  <Select value={selectedCluster} onValueChange={setSelectedCluster}>
+                  <Select value={selectedCluster} onValueChange={(value) => {
+                    setSelectedCluster(value)
+                    setStatusFilter(null) // Clear filter when manually changing cluster
+                  }}>
                     <SelectTrigger className="w-64">
                       <SelectValue placeholder="Select a cluster" />
                     </SelectTrigger>
@@ -412,14 +627,15 @@ export default function ECSStatusDashboard() {
                     <Checkbox
                       id="select-all"
                       checked={
-                        selectedClusterData.services.length > 0 &&
-                        selectedServices.size === selectedClusterData.services.length
+                        getFilteredServices().length > 0 &&
+                        selectedServices.size === getFilteredServices().length
                       }
                       onCheckedChange={handleSelectAll}
-                      disabled={selectedClusterData.services.length === 0}
+                      disabled={getFilteredServices().length === 0}
                     />
                     <label htmlFor="select-all" className="text-sm font-medium">
-                      Select All Services ({selectedClusterData.services.length})
+                      Select All Services ({getFilteredServices().length}
+                      {statusFilter && ` filtered from ${selectedClusterData.services.length} total`})
                     </label>
                   </div>
 
@@ -434,12 +650,13 @@ export default function ECSStatusDashboard() {
                           <TableHead>Task Definition</TableHead>
                           <TableHead>Last Deployment</TableHead>
                           <TableHead>Created</TableHead>
+                          <TableHead className="w-24">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {selectedClusterData.error ? (
                           <TableRow>
-                            <TableCell colSpan={7} className="text-center py-8">
+                            <TableCell colSpan={8} className="text-center py-8">
                               <div className="text-red-600">
                                 <AlertCircle className="w-8 h-8 mx-auto mb-2" />
                                 <p className="font-medium">Error loading services</p>
@@ -447,14 +664,24 @@ export default function ECSStatusDashboard() {
                               </div>
                             </TableCell>
                           </TableRow>
-                        ) : selectedClusterData.services.length === 0 ? (
+                        ) : getFilteredServices().length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={7} className="text-center py-8 text-gray-500">
-                              No services found in this cluster
+                            <TableCell colSpan={8} className="text-center py-8 text-gray-500">
+                              {statusFilter 
+                                ? `No services found with ${statusFilter === 'running' ? 'running tasks' : statusFilter === 'pending' ? 'pending tasks' : 'active status'}`
+                                : "No services found in this cluster"
+                              }
+                              {statusFilter && (
+                                <div className="mt-2">
+                                  <Button variant="outline" size="sm" onClick={clearFilter}>
+                                    Clear Filter
+                                  </Button>
+                                </div>
+                              )}
                             </TableCell>
                           </TableRow>
                         ) : (
-                          selectedClusterData.services.map((service) => (
+                          getFilteredServices().map((service) => (
                             <TableRow key={service.serviceName}>
                               <TableCell>
                                 <Checkbox
@@ -496,6 +723,23 @@ export default function ECSStatusDashboard() {
                               </TableCell>
                               <TableCell className="text-sm text-gray-500">
                                 {service.createdAt ? new Date(service.createdAt).toLocaleDateString() : "N/A"}
+                              </TableCell>
+                              <TableCell>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleConnectShell(service.serviceName, selectedCluster)}
+                                  disabled={service.runningCount === 0}
+                                  className="flex items-center gap-1 hover:bg-green-50 hover:border-green-300"
+                                  title={
+                                    service.runningCount === 0 
+                                      ? "❌ No running tasks available for shell connection" 
+                                      : `🔗 Download shell connection script for ${service.serviceName}\n\n• Downloads a .bat file to connect via AWS CLI\n• Requires AWS CLI v2 and proper credentials\n• ECS Exec must be enabled for the service`
+                                  }
+                                >
+                                  <Terminal className="w-3 h-3" />
+                                  <span className="hidden sm:inline">Shell</span>
+                                </Button>
                               </TableCell>
                             </TableRow>
                           ))
