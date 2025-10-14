@@ -20,8 +20,22 @@ import {
   Wifi,
   WifiOff,
   Terminal,
+  BarChart3,
 } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
+
+interface ServiceMetrics {
+  cpu: {
+    value: string | null
+    unit: string
+    timestamp: string | null
+  }
+  memory: {
+    value: string | null
+    unit: string
+    timestamp: string | null
+  }
+}
 
 interface ServiceStatus {
   serviceName: string
@@ -33,11 +47,14 @@ interface ServiceStatus {
   taskDefinition: string
   platformVersion?: string
   createdAt?: string
+  cpuSpec?: string | null
+  memorySpec?: string | null
   lastDeployment?: {
     status: string
     createdAt: string
     taskDefinition: string
   }
+  metrics?: ServiceMetrics
 }
 
 interface ClusterData {
@@ -74,6 +91,8 @@ export default function ECSStatusDashboard() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [awsHealth, setAwsHealth] = useState<AWSHealthStatus | null>(null)
   const [statusFilter, setStatusFilter] = useState<string | null>(null)
+  const [loadingMetrics, setLoadingMetrics] = useState<Set<string>>(new Set())
+  const [metricsData, setMetricsData] = useState<Map<string, ServiceMetrics>>(new Map())
 
   const clusterNames = ["kairos-pay-cluster-ecs-iac", "kairos-his-cluster-ecs-iac", "kairos-pas-cluster-ecs-iac"]
 
@@ -91,6 +110,56 @@ export default function ECSStatusDashboard() {
         timestamp: new Date().toISOString(),
       })
     }
+  }
+
+  const fetchServiceMetrics = async (serviceName: string, clusterName: string) => {
+    const serviceKey = `${clusterName}:${serviceName}`
+    
+    setLoadingMetrics(prev => new Set(prev).add(serviceKey))
+    
+    try {
+      const response = await fetch("/api/ecs-metrics", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          serviceName,
+          clusterName,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch metrics")
+      }
+
+      const data = await response.json()
+      
+      setMetricsData(prev => {
+        const newMap = new Map(prev)
+        newMap.set(serviceKey, {
+          cpu: data.cpu,
+          memory: data.memory,
+        })
+        return newMap
+      })
+    } catch (err) {
+      console.error("Failed to fetch metrics:", err)
+    } finally {
+      setLoadingMetrics(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(serviceKey)
+        return newSet
+      })
+    }
+  }
+
+  const fetchAllServiceMetrics = async (clusterName: string, services: ServiceStatus[]) => {
+    const metricsPromises = services
+      .filter(service => service.runningCount > 0)
+      .map(service => fetchServiceMetrics(service.serviceName, clusterName))
+    
+    await Promise.all(metricsPromises)
   }
 
   const fetchECSStatus = async () => {
@@ -561,7 +630,7 @@ export default function ECSStatusDashboard() {
                       </span>
                     )}
                     <span className="block text-sm text-gray-500 mt-1">
-                      💡 Use the Shell button to download connection scripts for running services
+                      💡 Click the chart icon button to fetch CPU/RAM metrics from CloudWatch • Use Shell button to download connection scripts
                     </span>
                   </CardDescription>
                 </div>
@@ -582,6 +651,18 @@ export default function ECSStatusDashboard() {
                       ))}
                     </SelectContent>
                   </Select>
+                  <Button
+                    onClick={() => selectedClusterData && fetchAllServiceMetrics(selectedCluster, getFilteredServices())}
+                    disabled={!selectedClusterData || getFilteredServices().filter(s => s.runningCount > 0).length === 0 || loadingMetrics.size > 0}
+                    variant="outline"
+                  >
+                    {loadingMetrics.size > 0 ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <BarChart3 className="w-4 h-4 mr-2" />
+                    )}
+                    Load All Metrics
+                  </Button>
                   <Button
                     onClick={handleForceUpdate}
                     disabled={selectedServices.size === 0 || updating}
@@ -647,16 +728,18 @@ export default function ECSStatusDashboard() {
                           <TableHead>Service Name</TableHead>
                           <TableHead>Status</TableHead>
                           <TableHead>Tasks</TableHead>
+                          <TableHead>CPU</TableHead>
+                          <TableHead>RAM</TableHead>
                           <TableHead>Task Definition</TableHead>
                           <TableHead>Last Deployment</TableHead>
                           <TableHead>Created</TableHead>
-                          <TableHead className="w-24">Actions</TableHead>
+                          <TableHead className="w-32">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {selectedClusterData.error ? (
                           <TableRow>
-                            <TableCell colSpan={8} className="text-center py-8">
+                            <TableCell colSpan={10} className="text-center py-8">
                               <div className="text-red-600">
                                 <AlertCircle className="w-8 h-8 mx-auto mb-2" />
                                 <p className="font-medium">Error loading services</p>
@@ -666,7 +749,7 @@ export default function ECSStatusDashboard() {
                           </TableRow>
                         ) : getFilteredServices().length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={8} className="text-center py-8 text-gray-500">
+                            <TableCell colSpan={10} className="text-center py-8 text-gray-500">
                               {statusFilter 
                                 ? `No services found with ${statusFilter === 'running' ? 'running tasks' : statusFilter === 'pending' ? 'pending tasks' : 'active status'}`
                                 : "No services found in this cluster"
@@ -708,6 +791,164 @@ export default function ECSStatusDashboard() {
                                   )}
                                 </div>
                               </TableCell>
+                              <TableCell>
+                                {(() => {
+                                  const serviceKey = `${selectedCluster}:${service.serviceName}`
+                                  const metrics = metricsData.get(serviceKey)
+                                  const isLoading = loadingMetrics.has(serviceKey)
+
+                                  // Format CPU spec (convert to vCPU if it's a number)
+                                  const formatCpuSpec = (spec: string | null | undefined) => {
+                                    if (!spec) return null
+                                    const cpuNum = parseInt(spec)
+                                    if (cpuNum >= 1024) {
+                                      return `${(cpuNum / 1024).toFixed(2)} vCPU`
+                                    }
+                                    return `${spec} units`
+                                  }
+
+                                  const cpuSpecFormatted = formatCpuSpec(service.cpuSpec)
+
+                                  if (service.runningCount === 0) {
+                                    return (
+                                      <div className="text-sm">
+                                        <span className="text-gray-400">N/A</span>
+                                        {cpuSpecFormatted && (
+                                          <div className="text-xs text-gray-400 mt-0.5">
+                                            Spec: {cpuSpecFormatted}
+                                          </div>
+                                        )}
+                                      </div>
+                                    )
+                                  }
+
+                                  if (isLoading) {
+                                    return (
+                                      <div className="text-sm">
+                                        <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
+                                        {cpuSpecFormatted && (
+                                          <div className="text-xs text-gray-500 mt-0.5">
+                                            {cpuSpecFormatted}
+                                          </div>
+                                        )}
+                                      </div>
+                                    )
+                                  }
+
+                                  if (metrics?.cpu.value) {
+                                    return (
+                                      <div className="text-sm">
+                                        <span className={`font-medium ${parseFloat(metrics.cpu.value) > 80 ? 'text-red-600' : parseFloat(metrics.cpu.value) > 60 ? 'text-yellow-600' : 'text-green-600'}`}>
+                                          {metrics.cpu.value}%
+                                        </span>
+                                        {cpuSpecFormatted && (
+                                          <div className="text-xs text-gray-500 mt-0.5">
+                                            {cpuSpecFormatted}
+                                          </div>
+                                        )}
+                                      </div>
+                                    )
+                                  }
+
+                                  return (
+                                    <div className="text-sm">
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => fetchServiceMetrics(service.serviceName, selectedCluster)}
+                                        className="h-6 px-2 text-xs"
+                                      >
+                                        <BarChart3 className="w-3 h-3 mr-1" />
+                                        Load
+                                      </Button>
+                                      {cpuSpecFormatted && (
+                                        <div className="text-xs text-gray-500 mt-0.5">
+                                          {cpuSpecFormatted}
+                                        </div>
+                                      )}
+                                    </div>
+                                  )
+                                })()}
+                              </TableCell>
+                              <TableCell>
+                                {(() => {
+                                  const serviceKey = `${selectedCluster}:${service.serviceName}`
+                                  const metrics = metricsData.get(serviceKey)
+                                  const isLoading = loadingMetrics.has(serviceKey)
+
+                                  // Format Memory spec
+                                  const formatMemorySpec = (spec: string | null | undefined) => {
+                                    if (!spec) return null
+                                    const memNum = parseInt(spec)
+                                    if (memNum >= 1024) {
+                                      return `${(memNum / 1024).toFixed(2)} GB`
+                                    }
+                                    return `${spec} MB`
+                                  }
+
+                                  const memorySpecFormatted = formatMemorySpec(service.memorySpec)
+
+                                  if (service.runningCount === 0) {
+                                    return (
+                                      <div className="text-sm">
+                                        <span className="text-gray-400">N/A</span>
+                                        {memorySpecFormatted && (
+                                          <div className="text-xs text-gray-400 mt-0.5">
+                                            Spec: {memorySpecFormatted}
+                                          </div>
+                                        )}
+                                      </div>
+                                    )
+                                  }
+
+                                  if (isLoading) {
+                                    return (
+                                      <div className="text-sm">
+                                        <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
+                                        {memorySpecFormatted && (
+                                          <div className="text-xs text-gray-500 mt-0.5">
+                                            {memorySpecFormatted}
+                                          </div>
+                                        )}
+                                      </div>
+                                    )
+                                  }
+
+                                  if (metrics?.memory.value) {
+                                    return (
+                                      <div className="text-sm">
+                                        <span className={`font-medium ${parseFloat(metrics.memory.value) > 80 ? 'text-red-600' : parseFloat(metrics.memory.value) > 60 ? 'text-yellow-600' : 'text-green-600'}`}>
+                                          {metrics.memory.value}%
+                                        </span>
+                                        {memorySpecFormatted && (
+                                          <div className="text-xs text-gray-500 mt-0.5">
+                                            {memorySpecFormatted}
+                                          </div>
+                                        )}
+                                      </div>
+                                    )
+                                  }
+
+                                  return (
+                                    <div className="text-sm">
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => fetchServiceMetrics(service.serviceName, selectedCluster)}
+                                        className="h-6 px-2 text-xs"
+                                      >
+                                        <BarChart3 className="w-3 h-3 mr-1" />
+                                        Load
+                                      </Button>
+                                      {memorySpecFormatted && (
+                                        <div className="text-xs text-gray-500 mt-0.5">
+                                          {memorySpecFormatted}
+                                        </div>
+                                      )}
+                                    </div>
+                                  )
+                                })()}
+                              </TableCell>
                               <TableCell className="font-mono text-sm">{service.taskDefinition}</TableCell>
                               <TableCell>
                                 {service.lastDeployment ? (
@@ -725,21 +966,52 @@ export default function ECSStatusDashboard() {
                                 {service.createdAt ? new Date(service.createdAt).toLocaleDateString() : "N/A"}
                               </TableCell>
                               <TableCell>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleConnectShell(service.serviceName, selectedCluster)}
-                                  disabled={service.runningCount === 0}
-                                  className="flex items-center gap-1 hover:bg-green-50 hover:border-green-300"
-                                  title={
-                                    service.runningCount === 0 
-                                      ? "❌ No running tasks available for shell connection" 
-                                      : `🔗 Download shell connection script for ${service.serviceName}\n\n• Downloads a .bat file to connect via AWS CLI\n• Requires AWS CLI v2 and proper credentials\n• ECS Exec must be enabled for the service`
-                                  }
-                                >
-                                  <Terminal className="w-3 h-3" />
-                                  <span className="hidden sm:inline">Shell</span>
-                                </Button>
+                                <div className="flex items-center gap-1">
+                                  {(() => {
+                                    const serviceKey = `${selectedCluster}:${service.serviceName}`
+                                    const metrics = metricsData.get(serviceKey)
+                                    const isLoading = loadingMetrics.has(serviceKey)
+                                    
+                                    return (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => fetchServiceMetrics(service.serviceName, selectedCluster)}
+                                        disabled={service.runningCount === 0 || isLoading}
+                                        className="flex items-center gap-1 hover:bg-blue-50 hover:border-blue-300"
+                                        title={
+                                          service.runningCount === 0
+                                            ? "No running tasks available"
+                                            : metrics
+                                            ? `CPU: ${metrics.cpu.value || 'N/A'}% | RAM: ${metrics.memory.value || 'N/A'}%`
+                                            : "Fetch CPU and RAM metrics from CloudWatch"
+                                        }
+                                      >
+                                        {isLoading ? (
+                                          <Loader2 className="w-3 h-3 animate-spin" />
+                                        ) : metrics ? (
+                                          <CheckCircle className="w-3 h-3 text-green-600" />
+                                        ) : (
+                                          <BarChart3 className="w-3 h-3" />
+                                        )}
+                                      </Button>
+                                    )
+                                  })()}
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleConnectShell(service.serviceName, selectedCluster)}
+                                    disabled={service.runningCount === 0}
+                                    className="flex items-center gap-1 hover:bg-green-50 hover:border-green-300"
+                                    title={
+                                      service.runningCount === 0 
+                                        ? "❌ No running tasks available for shell connection" 
+                                        : `🔗 Download shell connection script for ${service.serviceName}\n\n• Downloads a .bat file to connect via AWS CLI\n• Requires AWS CLI v2 and proper credentials\n• ECS Exec must be enabled for the service`
+                                    }
+                                  >
+                                    <Terminal className="w-3 h-3" />
+                                  </Button>
+                                </div>
                               </TableCell>
                             </TableRow>
                           ))
