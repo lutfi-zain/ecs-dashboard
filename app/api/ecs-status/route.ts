@@ -1,9 +1,27 @@
 export const runtime = "nodejs"
 import { NextResponse } from "next/server"
-import { DescribeClustersCommand, ListServicesCommand, DescribeServicesCommand } from "@aws-sdk/client-ecs"
+import { DescribeClustersCommand, ListServicesCommand, DescribeServicesCommand, DescribeTaskDefinitionCommand, ECSClient } from "@aws-sdk/client-ecs"
 import { createECSClient } from "@/lib/aws-config"
 
 const clusterNames = ["kairos-pay-cluster-ecs-iac", "kairos-his-cluster-ecs-iac", "kairos-pas-cluster-ecs-iac"]
+interface ECSServiceInfo {
+  serviceName: string;
+  serviceArn: string;
+  status: string;
+  runningCount: number;
+  pendingCount: number;
+  desiredCount: number;
+  taskDefinition: string;
+  platformVersion?: string;
+  createdAt?: string;
+  cpuSpec: string | null;
+  memorySpec: string | null;
+  lastDeployment?: {
+    status: string;
+    createdAt: string;
+    taskDefinition: string;
+  };
+}
 
 export async function GET() {
   try {
@@ -54,7 +72,9 @@ export async function GET() {
             nextToken = servicesResponse.nextToken
           } while (nextToken)
 
-          let services = []
+
+
+          let services: ECSServiceInfo[] = []
           if (allServiceArns.length > 0) {
             // Process services in batches of 10 (DescribeServices limit)
             const batchSize = 10
@@ -79,24 +99,72 @@ export async function GET() {
             // Flatten all service details
             const flattenedServices = allServiceDetails.flat()
 
-            services = flattenedServices.map((service) => ({
-              serviceName: service.serviceName || "Unknown",
-              serviceArn: service.serviceArn || "",
-              status: service.status || "Unknown",
-              runningCount: service.runningCount || 0,
-              pendingCount: service.pendingCount || 0,
-              desiredCount: service.desiredCount || 0,
-              taskDefinition: service.taskDefinition?.split("/").pop() || "Unknown",
-              platformVersion: service.platformVersion,
-              createdAt: service.createdAt?.toISOString(),
-              lastDeployment: service.deployments?.[0]
-                ? {
-                    status: service.deployments[0].status || "Unknown",
-                    createdAt: service.deployments[0].createdAt?.toISOString() || new Date().toISOString(),
-                    taskDefinition: service.deployments[0].taskDefinition?.split("/").pop() || "Unknown",
+            // Get task definition details for CPU and memory specs
+            const servicesWithSpecs = await Promise.all(
+              flattenedServices.map(async (service) => {
+                let cpuSpec = null
+                let memorySpec = null
+
+                try {
+                  if (service.taskDefinition) {
+                    const taskDefResponse = await ecsClient.send(
+                      new DescribeTaskDefinitionCommand({
+                        taskDefinition: service.taskDefinition,
+                      })
+                    )
+
+                    const taskDef = taskDefResponse.taskDefinition
+                    if (taskDef) {
+                      // Get task-level CPU and memory (for Fargate)
+                      cpuSpec = taskDef.cpu || null
+                      memorySpec = taskDef.memory || null
+
+                      // If not set at task level, sum container-level specs (for EC2)
+                      if (!cpuSpec && taskDef.containerDefinitions) {
+                        const totalCpu = taskDef.containerDefinitions.reduce(
+                          (sum, container) => sum + (container.cpu || 0),
+                          0
+                        )
+                        cpuSpec = totalCpu > 0 ? totalCpu.toString() : null
+                      }
+
+                      if (!memorySpec && taskDef.containerDefinitions) {
+                        const totalMemory = taskDef.containerDefinitions.reduce(
+                          (sum, container) => sum + (container.memory || container.memoryReservation || 0),
+                          0
+                        )
+                        memorySpec = totalMemory > 0 ? totalMemory.toString() : null
+                      }
+                    }
                   }
-                : undefined,
-            }))
+                } catch (error) {
+                  console.error(`Error fetching task definition for ${service.serviceName}:`, error)
+                }
+
+                return {
+                  serviceName: service.serviceName || "Unknown",
+                  serviceArn: service.serviceArn || "",
+                  status: service.status || "Unknown",
+                  runningCount: service.runningCount || 0,
+                  pendingCount: service.pendingCount || 0,
+                  desiredCount: service.desiredCount || 0,
+                  taskDefinition: service.taskDefinition?.split("/").pop() || "Unknown",
+                  platformVersion: service.platformVersion,
+                  createdAt: service.createdAt?.toISOString(),
+                  cpuSpec,
+                  memorySpec,
+                  lastDeployment: service.deployments?.[0]
+                    ? {
+                      status: service.deployments[0].status || "Unknown",
+                      createdAt: service.deployments[0].createdAt?.toISOString() || new Date().toISOString(),
+                      taskDefinition: service.deployments[0].taskDefinition?.split("/").pop() || "Unknown",
+                    }
+                    : undefined,
+                }
+              })
+            )
+
+            services = servicesWithSpecs
           }
 
           return {

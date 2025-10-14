@@ -1,4 +1,5 @@
 import { ECSClient } from "@aws-sdk/client-ecs"
+import { CloudWatchClient } from "@aws-sdk/client-cloudwatch"
 import { fromIni } from "@aws-sdk/credential-providers"
 
 // AWS Configuration with flexible credential handling
@@ -40,6 +41,17 @@ export const createECSClient = () => {
     return new ECSClient(config)
   } catch (error) {
     console.error("Failed to create ECS client:", error)
+    throw error
+  }
+}
+
+// Create CloudWatch client with flexible credential handling
+export const createCloudWatchClient = () => {
+  try {
+    const config = getAWSConfig()
+    return new CloudWatchClient(config)
+  } catch (error) {
+    console.error("Failed to create CloudWatch client:", error)
     throw error
   }
 }
