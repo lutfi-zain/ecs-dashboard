@@ -11,6 +11,7 @@
   "dependencies": {
     "@aws-sdk/client-cloudwatch": "^3.908.0",
     "@aws-sdk/client-ecs": "latest",
+    "@aws-sdk/client-secrets-manager": "^3.927.0",
     "@aws-sdk/credential-providers": "^3.840.0",
     "@aws-sdk/shared-ini-file-loader": "^3.370.0",
     "@hookform/resolvers": "^3.9.1",

@@ -114,9 +114,9 @@ export default function ECSStatusDashboard() {
 
   const fetchServiceMetrics = async (serviceName: string, clusterName: string) => {
     const serviceKey = `${clusterName}:${serviceName}`
-    
+
     setLoadingMetrics(prev => new Set(prev).add(serviceKey))
-    
+
     try {
       const response = await fetch("/api/ecs-metrics", {
         method: "POST",
@@ -134,7 +134,7 @@ export default function ECSStatusDashboard() {
       }
 
       const data = await response.json()
-      
+
       setMetricsData(prev => {
         const newMap = new Map(prev)
         newMap.set(serviceKey, {
@@ -158,7 +158,7 @@ export default function ECSStatusDashboard() {
     const metricsPromises = services
       .filter(service => service.runningCount > 0)
       .map(service => fetchServiceMetrics(service.serviceName, clusterName))
-    
+
     await Promise.all(metricsPromises)
   }
 
@@ -181,7 +181,7 @@ export default function ECSStatusDashboard() {
       if (!selectedCluster && data.length > 0) {
         setSelectedCluster(data[0].clusterName)
       }
-      
+
       // Clear filter when data refreshes
       setStatusFilter(null)
     } catch (err) {
@@ -309,9 +309,9 @@ export default function ECSStatusDashboard() {
 
   const getFilteredServices = () => {
     if (!selectedClusterData) return []
-    
+
     let services = selectedClusterData.services
-    
+
     if (statusFilter === 'running') {
       services = services.filter(service => service.runningCount > 0)
     } else if (statusFilter === 'pending') {
@@ -320,7 +320,7 @@ export default function ECSStatusDashboard() {
       // Show all services (no additional filtering)
       services = selectedClusterData.services
     }
-    
+
     return services
   }
 
@@ -331,7 +331,7 @@ export default function ECSStatusDashboard() {
   const handleConnectShell = async (serviceName: string, clusterName: string) => {
     try {
       const region = 'ap-southeast-3' // Based on the region mentioned in the UI
-      
+
       // Create a comprehensive batch file with error handling
       const batchCommands = [
         '@echo off',
@@ -432,7 +432,7 @@ export default function ECSStatusDashboard() {
       link.click()
       document.body.removeChild(link)
       window.URL.revokeObjectURL(url)
-      
+
       // Show instruction modal/alert
       const message = `📥 Shell connection script downloaded!
 
@@ -449,7 +449,7 @@ export default function ECSStatusDashboard() {
 ⚠️ Note: If connection fails, the service may need ECS Exec enabled.`
 
       alert(message)
-      
+
     } catch (err) {
       console.error('Error creating shell connection:', err)
       alert('❌ Error creating shell connection script. Please try again.')
@@ -489,6 +489,12 @@ export default function ECSStatusDashboard() {
             <h1 className="text-3xl font-bold text-gray-900 mb-2">ECS Cluster Management</h1>
             <div className="flex items-center gap-4">
               <p className="text-gray-600">Monitor and manage your Amazon ECS clusters and services</p>
+              <a
+                href="/secrets-manager"
+                className="text-sm text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
+              >
+                🔐 Secrets Manager
+              </a>
               {awsHealth && (
                 <Badge
                   variant={awsHealth.status === "healthy" ? "default" : "destructive"}
@@ -563,7 +569,7 @@ export default function ECSStatusDashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-3 gap-4">
-                    <div 
+                    <div
                       className="text-center cursor-pointer hover:bg-blue-50 rounded p-2 transition-colors"
                       onClick={(e) => {
                         e.stopPropagation()
@@ -573,7 +579,7 @@ export default function ECSStatusDashboard() {
                       <div className="text-xl font-bold text-blue-600">{cluster.activeServicesCount}</div>
                       <div className="text-xs text-gray-600">Services</div>
                     </div>
-                    <div 
+                    <div
                       className="text-center cursor-pointer hover:bg-green-50 rounded p-2 transition-colors"
                       onClick={(e) => {
                         e.stopPropagation()
@@ -583,7 +589,7 @@ export default function ECSStatusDashboard() {
                       <div className="text-xl font-bold text-green-600">{cluster.runningTasksCount}</div>
                       <div className="text-xs text-gray-600">Running</div>
                     </div>
-                    <div 
+                    <div
                       className="text-center cursor-pointer hover:bg-yellow-50 rounded p-2 transition-colors"
                       onClick={(e) => {
                         e.stopPropagation()
@@ -750,7 +756,7 @@ export default function ECSStatusDashboard() {
                         ) : getFilteredServices().length === 0 ? (
                           <TableRow>
                             <TableCell colSpan={10} className="text-center py-8 text-gray-500">
-                              {statusFilter 
+                              {statusFilter
                                 ? `No services found with ${statusFilter === 'running' ? 'running tasks' : statusFilter === 'pending' ? 'pending tasks' : 'active status'}`
                                 : "No services found in this cluster"
                               }
@@ -971,7 +977,7 @@ export default function ECSStatusDashboard() {
                                     const serviceKey = `${selectedCluster}:${service.serviceName}`
                                     const metrics = metricsData.get(serviceKey)
                                     const isLoading = loadingMetrics.has(serviceKey)
-                                    
+
                                     return (
                                       <Button
                                         variant="outline"
@@ -983,8 +989,8 @@ export default function ECSStatusDashboard() {
                                           service.runningCount === 0
                                             ? "No running tasks available"
                                             : metrics
-                                            ? `CPU: ${metrics.cpu.value || 'N/A'}% | RAM: ${metrics.memory.value || 'N/A'}%`
-                                            : "Fetch CPU and RAM metrics from CloudWatch"
+                                              ? `CPU: ${metrics.cpu.value || 'N/A'}% | RAM: ${metrics.memory.value || 'N/A'}%`
+                                              : "Fetch CPU and RAM metrics from CloudWatch"
                                         }
                                       >
                                         {isLoading ? (
@@ -1004,8 +1010,8 @@ export default function ECSStatusDashboard() {
                                     disabled={service.runningCount === 0}
                                     className="flex items-center gap-1 hover:bg-green-50 hover:border-green-300"
                                     title={
-                                      service.runningCount === 0 
-                                        ? "❌ No running tasks available for shell connection" 
+                                      service.runningCount === 0
+                                        ? "❌ No running tasks available for shell connection"
                                         : `🔗 Download shell connection script for ${service.serviceName}\n\n• Downloads a .bat file to connect via AWS CLI\n• Requires AWS CLI v2 and proper credentials\n• ECS Exec must be enabled for the service`
                                     }
                                   >
