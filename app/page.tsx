@@ -94,7 +94,7 @@ export default function ECSStatusDashboard() {
   const [loadingMetrics, setLoadingMetrics] = useState<Set<string>>(new Set())
   const [metricsData, setMetricsData] = useState<Map<string, ServiceMetrics>>(new Map())
 
-  const clusterNames = ["kairos-pay-cluster-ecs-iac", "kairos-his-cluster-ecs-iac", "kairos-pas-cluster-ecs-iac"]
+  const clusterNames = ["kairos-pay-cluster-ecs-iac", "kairos-his-cluster-ecs-iac", "kairos-pas-cluster-ecs-iac","kairos-fe-cluster-ecs-iac"]
 
   const checkAWSHealth = async () => {
     try {
