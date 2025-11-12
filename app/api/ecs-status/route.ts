@@ -1,4 +1,8 @@
 export const runtime = "nodejs"
+// Add revalidation and dynamic settings for better build behavior
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 import { NextResponse } from "next/server"
 import { DescribeClustersCommand, ListServicesCommand, DescribeServicesCommand, DescribeTaskDefinitionCommand, ECSClient } from "@aws-sdk/client-ecs"
 import { createECSClient } from "@/lib/aws-config"

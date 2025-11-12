@@ -1,4 +1,7 @@
 export const runtime = "nodejs"
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 import { type NextRequest, NextResponse } from "next/server"
 import { UpdateServiceCommand } from "@aws-sdk/client-ecs"
 import { createECSClient } from "@/lib/aws-config"

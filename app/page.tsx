@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { FALLBACK_CLUSTER_DATA, FALLBACK_AWS_HEALTH } from "@/lib/fallback-data"
+import { APICache, DataCache } from "@/lib/cache"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -81,15 +83,16 @@ interface AWSHealthStatus {
 }
 
 export default function ECSStatusDashboard() {
-  const [clusters, setClusters] = useState<ClusterData[]>([])
-  const [selectedCluster, setSelectedCluster] = useState<string>("")
+  // Initialize with fallback data for better loading experience and build compatibility
+  const [clusters, setClusters] = useState<ClusterData[]>(FALLBACK_CLUSTER_DATA)
+  const [selectedCluster, setSelectedCluster] = useState<string>("kairos-pay-cluster-ecs-iac")
   const [selectedServices, setSelectedServices] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [updateResults, setUpdateResults] = useState<UpdateResult[]>([])
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
-  const [awsHealth, setAwsHealth] = useState<AWSHealthStatus | null>(null)
+  const [awsHealth, setAwsHealth] = useState<AWSHealthStatus | null>(FALLBACK_AWS_HEALTH)
   const [statusFilter, setStatusFilter] = useState<string | null>(null)
   const [loadingMetrics, setLoadingMetrics] = useState<Set<string>>(new Set())
   const [metricsData, setMetricsData] = useState<Map<string, ServiceMetrics>>(new Map())
@@ -162,17 +165,63 @@ export default function ECSStatusDashboard() {
     await Promise.all(metricsPromises)
   }
 
-  const fetchECSStatus = async () => {
+  const fetchECSStatus = async (forceRefresh = false) => {
     try {
       setLoading(true)
       setError(null)
 
-      const response = await fetch("/api/ecs-status")
+      // Try cache first unless force refresh is requested
+      if (!forceRefresh) {
+        const cachedData = DataCache.get<ClusterData[]>('ecs-status')
+        if (cachedData && cachedData.length > 0) {
+          setClusters(cachedData)
+          setLastUpdated(new Date())
+          setLoading(false)
+          return
+        }
+      }
+
+      // Clear cache if force refresh
+      if (forceRefresh) {
+        DataCache.remove('ecs-status')
+      }
+
+      // Add retry logic with exponential backoff
+      let retries = 3
+      let response: Response | null = null
+      
+      while (retries > 0) {
+        try {
+          response = await fetch("/api/ecs-status", {
+            headers: {
+              'Cache-Control': 'no-cache',
+              'Pragma': 'no-cache',
+            },
+            signal: AbortSignal.timeout(30000), // 30 second timeout
+          })
+          break
+        } catch (fetchError) {
+          retries--
+          if (retries === 0) {
+            throw fetchError
+          }
+          // Wait before retry with exponential backoff
+          await new Promise(resolve => setTimeout(resolve, (4 - retries) * 1000))
+        }
+      }
+
+      if (!response) {
+        throw new Error("Failed to fetch data after retries")
+      }
+
       const data = await response.json()
 
       if (!response.ok) {
         throw new Error(data.error || "Failed to fetch ECS status")
       }
+
+      // Cache the successful response
+      DataCache.set('ecs-status', data, 5 * 60 * 1000) // Cache for 5 minutes
 
       setClusters(data)
       setLastUpdated(new Date())
@@ -185,7 +234,27 @@ export default function ECSStatusDashboard() {
       // Clear filter when data refreshes
       setStatusFilter(null)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred")
+      console.error('ECS Status fetch error:', err)
+      
+      let errorMessage = "An error occurred"
+      if (err instanceof Error) {
+        if (err.name === 'TimeoutError') {
+          errorMessage = "Request timed out - please check your connection"
+        } else if (err.message.includes('fetch')) {
+          errorMessage = "Network error - please check your connection"
+        } else {
+          errorMessage = err.message
+        }
+      }
+      
+      setError(errorMessage)
+      
+      // If we have cached data, use it as fallback
+      const cachedData = DataCache.get<ClusterData[]>('ecs-status')
+      if (cachedData && cachedData.length > 0) {
+        setClusters(cachedData)
+        setError(`${errorMessage} (showing cached data)`)
+      }
     } finally {
       setLoading(false)
     }
@@ -465,7 +534,7 @@ export default function ECSStatusDashboard() {
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Error Loading ECS Status</h2>
             <p className="text-gray-600 mb-4">{error}</p>
             <div className="space-y-2">
-              <Button onClick={fetchECSStatus}>
+              <Button onClick={() => fetchECSStatus(true)}>
                 <RefreshCw className="w-4 h-4 mr-2" />
                 Try Again
               </Button>
@@ -512,7 +581,7 @@ export default function ECSStatusDashboard() {
               <Wifi className="w-4 h-4 mr-2" />
               Check AWS
             </Button>
-            <Button onClick={fetchECSStatus} disabled={loading}>
+            <Button onClick={() => fetchECSStatus(true)} disabled={loading}>
               <RefreshCw className={`w-4 h-4 mr-2 ${loading ? "animate-spin" : ""}`} />
               Refresh
             </Button>
