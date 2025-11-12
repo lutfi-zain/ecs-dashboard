@@ -75,6 +75,12 @@ export default function SecretsManagerPage() {
     description: "",
   })
 
+  // Key-value pairs for structured editing
+  const [keyValuePairs, setKeyValuePairs] = useState<Array<{ id: string; key: string; value: string }>>([
+    { id: crypto.randomUUID(), key: "", value: "" },
+  ])
+  const [isJsonMode, setIsJsonMode] = useState(false)
+
   useEffect(() => {
     loadSecrets()
   }, [])
@@ -143,14 +149,28 @@ export default function SecretsManagerPage() {
 
       const secretData = data.data
       setCurrentSecret(secretData)
-      setFormData({
-        name: secretData.name,
-        value:
-          typeof secretData.value === "string"
-            ? secretData.value
-            : JSON.stringify(secretData.value, null, 2),
-        description: "",
-      })
+
+      // Check if the value is JSON object
+      if (typeof secretData.value === "object" && secretData.value !== null) {
+        // Convert object to key-value pairs
+        const pairs = Object.entries(secretData.value).map(([key, value]) => ({
+          id: crypto.randomUUID(),
+          key,
+          value: String(value),
+        }))
+        setKeyValuePairs(pairs.length > 0 ? pairs : [{ id: crypto.randomUUID(), key: "", value: "" }])
+        setIsJsonMode(false)
+      } else {
+        // Plain text mode
+        setFormData({
+          name: secretData.name,
+          value: String(secretData.value || ""),
+          description: "",
+        })
+        setKeyValuePairs([{ id: crypto.randomUUID(), key: "", value: "" }])
+        setIsJsonMode(true)
+      }
+
       setEditModalOpen(true)
     } catch (err: any) {
       setError(err.message || "Failed to load secret for editing")
@@ -160,6 +180,8 @@ export default function SecretsManagerPage() {
 
   const handleCreateSecret = () => {
     setFormData({ name: "", value: "", description: "" })
+    setKeyValuePairs([{ id: crypto.randomUUID(), key: "", value: "" }])
+    setIsJsonMode(false)
     setCreateModalOpen(true)
   }
 
@@ -168,15 +190,31 @@ export default function SecretsManagerPage() {
       setSubmitting(true)
       setError(null)
 
-      let secretValue = formData.value
+      let secretValue: any
 
-      // Try to parse as JSON
-      try {
-        if (formData.value.trim().startsWith("{") || formData.value.trim().startsWith("[")) {
-          secretValue = JSON.parse(formData.value)
+      if (isJsonMode) {
+        // Plain text or JSON string mode
+        secretValue = formData.value
+        // Try to parse as JSON
+        try {
+          if (formData.value.trim().startsWith("{") || formData.value.trim().startsWith("[")) {
+            secretValue = JSON.parse(formData.value)
+          }
+        } catch {
+          // Keep as string if not valid JSON
         }
-      } catch {
-        // Keep as string if not valid JSON
+      } else {
+        // Key-value pairs mode - convert to object
+        const validPairs = keyValuePairs.filter((pair) => pair.key.trim() !== "")
+
+        if (validPairs.length === 0) {
+          throw new Error("Please add at least one key-value pair")
+        }
+
+        secretValue = validPairs.reduce((acc, pair) => {
+          acc[pair.key.trim()] = pair.value
+          return acc
+        }, {} as Record<string, string>)
       }
 
       const response = await fetch("/api/secrets-manager", {
@@ -198,6 +236,8 @@ export default function SecretsManagerPage() {
       setSuccess("Secret created successfully")
       setCreateModalOpen(false)
       setFormData({ name: "", value: "", description: "" })
+      setKeyValuePairs([{ id: crypto.randomUUID(), key: "", value: "" }])
+      setIsJsonMode(false)
       loadSecrets()
     } catch (err: any) {
       setError(err.message || "Failed to create secret")
@@ -214,15 +254,23 @@ export default function SecretsManagerPage() {
       setSubmitting(true)
       setError(null)
 
-      let secretValue = formData.value
+      let secretValue: any
 
-      // Try to parse as JSON
-      try {
-        if (formData.value.trim().startsWith("{") || formData.value.trim().startsWith("[")) {
-          secretValue = JSON.parse(formData.value)
+      if (isJsonMode) {
+        // Plain text mode
+        secretValue = formData.value
+      } else {
+        // Key-value pairs mode - convert to object
+        const validPairs = keyValuePairs.filter((pair) => pair.key.trim() !== "")
+
+        if (validPairs.length === 0) {
+          throw new Error("Please add at least one key-value pair")
         }
-      } catch {
-        // Keep as string if not valid JSON
+
+        secretValue = validPairs.reduce((acc, pair) => {
+          acc[pair.key.trim()] = pair.value
+          return acc
+        }, {} as Record<string, string>)
       }
 
       const response = await fetch(`/api/secrets-manager/${encodeURIComponent(currentSecret.name)}`, {
@@ -230,7 +278,6 @@ export default function SecretsManagerPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           value: secretValue,
-          description: formData.description,
         }),
       })
 
@@ -244,6 +291,8 @@ export default function SecretsManagerPage() {
       setEditModalOpen(false)
       setCurrentSecret(null)
       setFormData({ name: "", value: "", description: "" })
+      setKeyValuePairs([{ id: crypto.randomUUID(), key: "", value: "" }])
+      setIsJsonMode(false)
       loadSecrets()
     } catch (err: any) {
       setError(err.message || "Failed to update secret")
@@ -251,6 +300,52 @@ export default function SecretsManagerPage() {
     } finally {
       setSubmitting(false)
     }
+  }
+
+  const addKeyValuePair = () => {
+    setKeyValuePairs([...keyValuePairs, { id: crypto.randomUUID(), key: "", value: "" }])
+  }
+
+  const removeKeyValuePair = (index: number) => {
+    if (keyValuePairs.length <= 1) {
+      return
+    }
+    setKeyValuePairs(keyValuePairs.filter((_, i) => i !== index))
+  }
+
+  const updateKeyValuePair = (index: number, field: "key" | "value", newValue: string) => {
+    const updated = [...keyValuePairs]
+    updated[index][field] = newValue
+    setKeyValuePairs(updated)
+  }
+
+  const toggleMode = () => {
+    if (isJsonMode) {
+      // Converting from JSON to key-value
+      try {
+        const parsed = JSON.parse(formData.value)
+        if (typeof parsed === "object" && parsed !== null) {
+          const pairs = Object.entries(parsed).map(([key, value]) => ({
+            id: crypto.randomUUID(),
+            key,
+            value: String(value),
+          }))
+          setKeyValuePairs(pairs.length > 0 ? pairs : [{ id: crypto.randomUUID(), key: "", value: "" }])
+        }
+      } catch {
+        // Keep current state if parsing fails
+        setKeyValuePairs([{ id: crypto.randomUUID(), key: "", value: "" }])
+      }
+    } else {
+      // Converting from key-value to JSON
+      const validPairs = keyValuePairs.filter((pair) => pair.key.trim() !== "")
+      const obj = validPairs.reduce((acc, pair) => {
+        acc[pair.key.trim()] = pair.value
+        return acc
+      }, {} as Record<string, string>)
+      setFormData({ ...formData, value: JSON.stringify(obj, null, 2) })
+    }
+    setIsJsonMode(!isJsonMode)
   }
 
   const handleDeleteSecret = async () => {
@@ -504,7 +599,7 @@ export default function SecretsManagerPage() {
 
         {/* Create Secret Modal */}
         <Dialog open={createModalOpen} onOpenChange={setCreateModalOpen}>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Plus className="w-5 h-5" />
@@ -522,18 +617,78 @@ export default function SecretsManagerPage() {
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="create-value">Secret Value *</Label>
-                <Textarea
-                  id="create-value"
-                  placeholder='{"key": "value"} or plain text'
-                  rows={8}
-                  value={formData.value}
-                  onChange={(e) => setFormData({ ...formData, value: e.target.value })}
-                  className="font-mono text-sm"
-                />
-                <p className="text-xs text-gray-500">Enter as plain text or JSON format</p>
+
+              {/* Mode Toggle */}
+              <div className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
+                <span className="text-sm font-medium text-gray-700">
+                  {isJsonMode ? "📝 Plain Text / JSON Mode" : "🔑 Key-Value Pairs Mode"}
+                </span>
+                <Button variant="outline" size="sm" onClick={toggleMode}>
+                  Switch to {isJsonMode ? "Key-Value Pairs" : "JSON Text"}
+                </Button>
               </div>
+
+              {isJsonMode ? (
+                /* JSON/Plain Text Mode */
+                <div className="space-y-2">
+                  <Label htmlFor="create-value">Secret Value *</Label>
+                  <Textarea
+                    id="create-value"
+                    placeholder='{"key": "value"} or plain text'
+                    rows={8}
+                    value={formData.value}
+                    onChange={(e) => setFormData({ ...formData, value: e.target.value })}
+                    className="font-mono text-sm"
+                  />
+                  <p className="text-xs text-gray-500">Enter as plain text or JSON format</p>
+                </div>
+              ) : (
+                /* Key-Value Pairs Mode */
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label>Key-Value Pairs *</Label>
+                    <Button variant="outline" size="sm" onClick={addKeyValuePair}>
+                      <Plus className="w-4 h-4 mr-1" />
+                      Add Field
+                    </Button>
+                  </div>
+                  <div className="space-y-2 max-h-96 overflow-y-auto pr-2">
+                    {keyValuePairs.map((pair, index) => (
+                      <div key={pair.id} className="flex gap-2 items-start">
+                        <div className="flex-1 space-y-1">
+                          <Input
+                            placeholder="Key (e.g., DB_HOST)"
+                            value={pair.key}
+                            onChange={(e) => updateKeyValuePair(index, "key", e.target.value)}
+                            className="font-mono text-sm"
+                          />
+                        </div>
+                        <div className="flex-1 space-y-1">
+                          <Input
+                            placeholder="Value"
+                            value={pair.value}
+                            onChange={(e) => updateKeyValuePair(index, "value", e.target.value)}
+                            className="font-mono text-sm"
+                          />
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => removeKeyValuePair(index)}
+                          disabled={keyValuePairs.length === 1}
+                          className="mt-0"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    Add configuration values as key-value pairs. Empty keys will be ignored.
+                  </p>
+                </div>
+              )}
+
               <div className="space-y-2">
                 <Label htmlFor="create-description">Description</Label>
                 <Textarea
@@ -551,7 +706,12 @@ export default function SecretsManagerPage() {
               </Button>
               <Button
                 onClick={handleSubmitCreate}
-                disabled={submitting || !formData.name || !formData.value}
+                disabled={
+                  submitting ||
+                  !formData.name ||
+                  (isJsonMode && !formData.value) ||
+                  (!isJsonMode && keyValuePairs.filter(p => p.key.trim() !== "").length === 0)
+                }
               >
                 {submitting ? (
                   <>
@@ -571,43 +731,98 @@ export default function SecretsManagerPage() {
 
         {/* Edit Secret Modal */}
         <Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Edit className="w-5 h-5" />
                 Update Secret: {currentSecret?.name}
               </DialogTitle>
-              <DialogDescription>Update the secret value</DialogDescription>
+              <DialogDescription>Update the secret value using key-value pairs or JSON text</DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="edit-value">Secret Value *</Label>
-                <Textarea
-                  id="edit-value"
-                  placeholder='{"key": "value"} or plain text'
-                  rows={8}
-                  value={formData.value}
-                  onChange={(e) => setFormData({ ...formData, value: e.target.value })}
-                  className="font-mono text-sm"
-                />
-                <p className="text-xs text-gray-500">Enter as plain text or JSON format</p>
+              {/* Mode Toggle */}
+              <div className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
+                <span className="text-sm font-medium text-gray-700">
+                  {isJsonMode ? "📝 Plain Text / JSON Mode" : "🔑 Key-Value Pairs Mode"}
+                </span>
+                <Button variant="outline" size="sm" onClick={toggleMode}>
+                  Switch to {isJsonMode ? "Key-Value Pairs" : "JSON Text"}
+                </Button>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-description">Description</Label>
-                <Textarea
-                  id="edit-description"
-                  placeholder="Optional description"
-                  rows={2}
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                />
-              </div>
+
+              {isJsonMode ? (
+                /* JSON/Plain Text Mode */
+                <div className="space-y-2">
+                  <Label htmlFor="edit-value">Secret Value *</Label>
+                  <Textarea
+                    id="edit-value"
+                    placeholder='{"key": "value"} or plain text'
+                    rows={12}
+                    value={formData.value}
+                    onChange={(e) => setFormData({ ...formData, value: e.target.value })}
+                    className="font-mono text-sm"
+                  />
+                  <p className="text-xs text-gray-500">Enter as plain text or JSON format</p>
+                </div>
+              ) : (
+                /* Key-Value Pairs Mode */
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label>Key-Value Pairs *</Label>
+                    <Button variant="outline" size="sm" onClick={addKeyValuePair}>
+                      <Plus className="w-4 h-4 mr-1" />
+                      Add Field
+                    </Button>
+                  </div>
+                  <div className="space-y-2 max-h-96 overflow-y-auto pr-2">
+                    {keyValuePairs.map((pair, index) => (
+                      <div key={pair.id} className="flex gap-2 items-start">
+                        <div className="flex-1 space-y-1">
+                          <Input
+                            placeholder="Key (e.g., DB_HOST)"
+                            value={pair.key}
+                            onChange={(e) => updateKeyValuePair(index, "key", e.target.value)}
+                            className="font-mono text-sm"
+                          />
+                        </div>
+                        <div className="flex-1 space-y-1">
+                          <Input
+                            placeholder="Value"
+                            value={pair.value}
+                            onChange={(e) => updateKeyValuePair(index, "value", e.target.value)}
+                            className="font-mono text-sm"
+                          />
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => removeKeyValuePair(index)}
+                          disabled={keyValuePairs.length === 1}
+                          className="mt-0"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    Add configuration values as key-value pairs. Empty keys will be ignored.
+                  </p>
+                </div>
+              )}
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setEditModalOpen(false)} disabled={submitting}>
                 Cancel
               </Button>
-              <Button onClick={handleSubmitUpdate} disabled={submitting || !formData.value}>
+              <Button
+                onClick={handleSubmitUpdate}
+                disabled={
+                  submitting ||
+                  (isJsonMode && !formData.value) ||
+                  (!isJsonMode && keyValuePairs.filter(p => p.key.trim() !== "").length === 0)
+                }
+              >
                 {submitting ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
