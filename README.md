@@ -26,6 +26,7 @@
 - [Configuration](#-configuration)
 - [Usage](#-usage)
 - [API Endpoints](#-api-endpoints)
+- [Security](#-security)
 - [Project Structure](#-project-structure)
 - [Contributing](#-contributing)
 - [Troubleshooting](#-troubleshooting)
@@ -78,6 +79,10 @@ The **ECS Cluster Management Dashboard** is a comprehensive web application buil
 - **🔐 Secure Credentials**: Environment variable-based AWS credential management
 - **🛡️ Error Boundaries**: Graceful error handling and recovery
 - **🔍 Input Validation**: Proper validation for all user inputs and API calls
+- **🚫 Rate Limiting**: Protection against bruteforce attacks and API abuse
+- **⏱️ Time Range Validation**: Prevents resource exhaustion from large queries
+- **✅ Cluster Whitelist**: Only allowed clusters can be accessed
+- **🔒 Injection Protection**: Input sanitization against XSS and SQL injection
 
 ---
 
@@ -315,7 +320,56 @@ Checks AWS connection health and credentials.
 
 ---
 
-## 📁 Project Structure
+## � Security
+
+The ECS Dashboard implements multiple security layers to protect against attacks and abuse.
+
+### Rate Limiting
+
+**Protection against bruteforce attacks:**
+- **Metrics API**: 10 requests per minute, 5-minute block after 3 violations
+- **Services API**: 20 requests per minute, 3-minute block after 3 violations
+- **IP-based tracking**: Combination of IP address and User-Agent
+- **Progressive blocking**: Automatic blocking after repeated violations
+
+**Example rate limit response:**
+```json
+{
+  "error": "Rate limit exceeded. Try again after [timestamp]",
+  "resetTime": 1699876543210
+}
+```
+
+### Input Validation
+
+**Protection against injection attacks:**
+- ✅ Cluster name whitelist validation
+- ✅ Service name pattern validation (max 255 chars)
+- ✅ Time range validation (max 30 days, within CloudWatch limits)
+- ✅ Suspicious pattern detection (HTML, JavaScript, SQL keywords)
+- ✅ Maximum input length enforcement
+
+### Security Best Practices
+
+1. **AWS Credentials**: Never commit credentials to version control
+2. **Environment Variables**: Use `.env.local` for sensitive data
+3. **HTTPS**: Always use HTTPS in production
+4. **IAM Permissions**: Follow principle of least privilege
+5. **Monitoring**: Regular review of rate limit violations
+
+### Testing Security
+
+Run the included security test script:
+```bash
+# PowerShell
+.\test-rate-limit.ps1
+```
+
+For detailed security documentation, see [SECURITY.md](SECURITY.md).
+
+---
+
+## �📁 Project Structure
 
 ```
 ecs-dashboard/

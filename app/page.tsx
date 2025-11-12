@@ -97,7 +97,7 @@ export default function ECSStatusDashboard() {
   const [loadingMetrics, setLoadingMetrics] = useState<Set<string>>(new Set())
   const [metricsData, setMetricsData] = useState<Map<string, ServiceMetrics>>(new Map())
 
-  const clusterNames = ["kairos-pay-cluster-ecs-iac", "kairos-his-cluster-ecs-iac", "kairos-pas-cluster-ecs-iac","kairos-fe-cluster-ecs-iac"]
+  const clusterNames = ["kairos-pay-cluster-ecs-iac", "kairos-his-cluster-ecs-iac", "kairos-pas-cluster-ecs-iac", "kairos-fe-cluster-ecs-iac"]
 
   const checkAWSHealth = async () => {
     try {
@@ -189,7 +189,7 @@ export default function ECSStatusDashboard() {
       // Add retry logic with exponential backoff
       let retries = 3
       let response: Response | null = null
-      
+
       while (retries > 0) {
         try {
           response = await fetch("/api/ecs-status", {
@@ -235,7 +235,7 @@ export default function ECSStatusDashboard() {
       setStatusFilter(null)
     } catch (err) {
       console.error('ECS Status fetch error:', err)
-      
+
       let errorMessage = "An error occurred"
       if (err instanceof Error) {
         if (err.name === 'TimeoutError') {
@@ -246,9 +246,9 @@ export default function ECSStatusDashboard() {
           errorMessage = err.message
         }
       }
-      
+
       setError(errorMessage)
-      
+
       // If we have cached data, use it as fallback
       const cachedData = DataCache.get<ClusterData[]>('ecs-status')
       if (cachedData && cachedData.length > 0) {
@@ -563,6 +563,12 @@ export default function ECSStatusDashboard() {
                 className="text-sm text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
               >
                 🔐 Secrets Manager
+              </a>
+              <a
+                href="/metrics"
+                className="text-sm text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
+              >
+                📊 Metrics Dashboard
               </a>
               {awsHealth && (
                 <Badge
