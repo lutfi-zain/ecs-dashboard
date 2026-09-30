@@ -1,0 +1,230 @@
+@import "tailwindcss";
+@import "@fontsource/geist-sans";
+@import "@fontsource/geist-mono";
+
+@theme {
+  --font-sans: 'Geist Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-serif: 'Newsreader', Georgia, Cambria, 'Times New Roman', serif;
+  --font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+
+  --radius-lg: 8px;
+  --radius-md: 6px;
+  --radius-sm: 4px;
+}
+
+:root {
+  --background: #F7F6F3;
+  --foreground: #111111;
+  --card: #FFFFFF;
+  --card-foreground: #111111;
+  --popover: #FFFFFF;
+  --popover-foreground: #111111;
+  --primary: #111111;
+  --primary-foreground: #FFFFFF;
+  --secondary: #F0EFEA;
+  --secondary-foreground: #111111;
+  --muted: #F0EFEA;
+  --muted-foreground: #787774;
+  --accent: #F0EFEA;
+  --accent-foreground: #111111;
+  --destructive: #9F2F2D;
+  --destructive-foreground: #FFFFFF;
+  --border: #EAEAEA;
+  --input: #EAEAEA;
+  --ring: #787774;
+
+  /* Minimalist Muted Pastels */
+  --pastel-green-bg: #EDF3EC;
+  --pastel-green-text: #346538;
+  --pastel-green-border: rgba(52, 101, 56, 0.15);
+
+  --pastel-yellow-bg: #FBF3DB;
+  --pastel-yellow-text: #956400;
+  --pastel-yellow-border: rgba(149, 100, 0, 0.15);
+
+  --pastel-red-bg: #FDEBEC;
+  --pastel-red-text: #9F2F2D;
+  --pastel-red-border: rgba(159, 47, 45, 0.15);
+
+  --pastel-blue-bg: #E1F3FE;
+  --pastel-blue-text: #1F6C9F;
+  --pastel-blue-border: rgba(31, 108, 159, 0.15);
+
+  /* Sidebar */
+  --sidebar-background: #F2F1ED;
+  --sidebar-foreground: #111111;
+  --sidebar-border: #EAEAEA;
+}
+
+.dark {
+  --background: #111111;
+  --foreground: #EDEDED;
+  --card: #191817;
+  --card-foreground: #EDEDED;
+  --popover: #191817;
+  --popover-foreground: #EDEDED;
+  --primary: #EDEDED;
+  --primary-foreground: #111111;
+  --secondary: #222120;
+  --secondary-foreground: #EDEDED;
+  --muted: #222120;
+  --muted-foreground: #8C8A86;
+  --accent: #222120;
+  --accent-foreground: #EDEDED;
+  --destructive: #F28B89;
+  --destructive-foreground: #111111;
+  --border: rgba(255, 255, 255, 0.08);
+  --input: rgba(255, 255, 255, 0.08);
+  --ring: #8C8A86;
+
+  /* Minimalist Muted Pastels (Dark mode) */
+  --pastel-green-bg: rgba(52, 101, 56, 0.22);
+  --pastel-green-text: #7BCB82;
+  --pastel-green-border: rgba(123, 203, 130, 0.25);
+
+  --pastel-yellow-bg: rgba(149, 100, 0, 0.22);
+  --pastel-yellow-text: #F3C769;
+  --pastel-yellow-border: rgba(243, 199, 105, 0.25);
+
+  --pastel-red-bg: rgba(159, 47, 45, 0.22);
+  --pastel-red-text: #F28B89;
+  --pastel-red-border: rgba(242, 139, 137, 0.25);
+
+  --pastel-blue-bg: rgba(31, 108, 159, 0.22);
+  --pastel-blue-text: #85C7F2;
+  --pastel-blue-border: rgba(133, 199, 242, 0.25);
+
+  /* Sidebar (Dark) */
+  --sidebar-background: #151413;
+  --sidebar-foreground: #EDEDED;
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+}
+
+/* Document & Editorial Foundation */
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  line-height: 1.6;
+  caret-color: var(--foreground);
+}
+
+/* Browser Surface Theming */
+::selection {
+  background-color: #E2DFD8;
+  color: #111111;
+}
+
+.dark ::selection {
+  background-color: #2D2B28;
+  color: #EDEDED;
+}
+
+/* Custom Minimalist Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(120, 119, 116, 0.25);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(120, 119, 116, 0.45);
+}
+
+/* Tabular Numerals Enforcement */
+table,
+.tabular-nums,
+[data-tabular-nums="true"] {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Keystroke Micro-UI */
+kbd {
+  font-family: var(--font-mono);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--muted);
+  padding: 0.1rem 0.35rem;
+  font-size: 0.75rem;
+  color: var(--foreground);
+}
+
+/* Bento Surface */
+.bento-card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background-color: var(--card);
+}
+
+/* Clean Button Interactions without Fluff */
+button,
+[role="button"] {
+  border-radius: 6px;
+  transition: transform 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+  outline: none;
+}
+
+button:focus-visible,
+[role="button"]:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 1px var(--foreground);
+}
+
+button:active:not(:disabled),
+[role="button"]:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+/* Micro-Shadow on Hover (strictly < 0.05 opacity) */
+.hover-lift {
+  transition: box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.hover-lift:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+}
+
+/* Subtle Ambient Depth in Main Viewport */
+.ambient-depth {
+  background-image: radial-gradient(circle at 50% 0%, rgba(220, 215, 205, 0.18), transparent 75%);
+}
+.dark .ambient-depth {
+  background-image: radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.02), transparent 75%);
+}

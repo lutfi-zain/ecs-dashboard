@@ -1,552 +1,116 @@
-<div align="center">
+# 🚀 ECS Cluster Management Dashboard (SvelteKit Edition)
 
-# 🚀 ECS Cluster Management Dashboard
-
-[![Next.js](https://img.shields.io/badge/Next.js-14.0-black?style=for-the-badge&logo=next.js)](https://nextjs.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
-[![AWS SDK](https://img.shields.io/badge/AWS_SDK-3.490-orange?style=for-the-badge&logo=amazon-aws)](https://aws.amazon.com/sdk-for-javascript/)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.0-38B2AC?style=for-the-badge&logo=tailwind-css)](https://tailwindcss.com/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
-
-**A modern, responsive web application for monitoring and managing Amazon ECS clusters and services**
-
-[Features](#-features) • [Installation](#-installation) • [Usage](#-usage) • [Configuration](#-configuration) • [API](#-api-endpoints) • [Contributing](#-contributing)
-
-</div>
-
----
-
-## 📋 Table of Contents
-
-- [Overview](#-overview)
-- [Features](#-features)
-- [Technologies Used](#-technologies-used)
-- [Prerequisites](#-prerequisites)
-- [Installation](#-installation)
-- [Configuration](#-configuration)
-- [Usage](#-usage)
-- [API Endpoints](#-api-endpoints)
-- [Security](#-security)
-- [Project Structure](#-project-structure)
-- [Contributing](#-contributing)
-- [Troubleshooting](#-troubleshooting)
-- [License](#-license)
-- [Support](#-support)
-
----
-
-## 🎯 Overview
-
-The **ECS Cluster Management Dashboard** is a comprehensive web application built with Next.js that provides real-time monitoring and management capabilities for Amazon Elastic Container Service (ECS) clusters. It offers an intuitive interface to view cluster status, manage services, and perform deployment operations across multiple ECS clusters.
-
-### 🎨 Key Highlights
-
-- **Real-time Monitoring**: Live status updates for clusters and services
-- **Multi-cluster Support**: Manage multiple ECS clusters from a single dashboard
-- **Service Management**: Select and perform bulk operations on ECS services
-- **Force Deployments**: Trigger new deployments with a single click
-- **Responsive Design**: Works seamlessly on desktop and mobile devices
-- **AWS Integration**: Native AWS SDK integration with proper credential handling
-
----
-
-## 📸 Screenshot
-
-![ECS Dashboard Interface](image.png)
-
-*The main dashboard interface showing cluster status, service management, and deployment controls*
-
----
+A high-performance, real-time operations dashboard for monitoring and managing Amazon Elastic Container Service (ECS) clusters and services, built with **SvelteKit**, **Svelte 5 (runes)**, **Tailwind CSS**, and **LayerCake**.
 
 ## ✨ Features
 
-### 🖥️ Dashboard Features
-- **📊 Cluster Overview**: Visual cards showing cluster status, active services, and task counts
-- **📋 Service Table**: Detailed table with service information, status, and deployment history
-- **🔄 Real-time Updates**: Auto-refresh functionality with manual refresh options
-- **🎯 Service Selection**: Individual and bulk service selection with checkboxes
-- **⚡ Force Updates**: Trigger force deployments for selected services
-- **🔍 Health Monitoring**: AWS connection health checks and status indicators
+- **⚡ Blazing Fast SSR**: Sub-300ms first paint powered by SvelteKit `+page.server.ts` load functions. Zero React virtual DOM overhead (~15KB compiled JavaScript).
+- **🎨 Minimalist Editorial Design**: Warm monochrome stone palette (`stone-50` to `stone-950`), custom typographic hierarchy (Newsreader display serif, Geist Sans, Geist Mono), ultra-flat 1px borders, and zero gratuitous drop shadows or saturated gradients.
+- **🌓 Dark Mode**: Seamless dark and light theme switching powered by `mode-watcher` with no flash of unstyled content.
+- **📊 Cluster & Service Overview**: High-level cluster health cards with running/pending task counters, active service tables with search, and status filtering.
+- **🚀 Rolling Force Deployments**: One-click multi-service force deployments (`forceNewDeployment: true`) with live status feedback.
+- **📈 CloudWatch Telemetry**: Interactive CPU and memory time-series charts using **LayerCake** with crosshair tooltips and customizable preset (15m to 7d) or custom time ranges.
+- **🔐 Secrets Manager**: AWS Secrets Manager browsing, JSON/plaintext inspection drawer, clipboard copy, and full CRUD creation/editing/deletion.
+- **💻 Linux ECS Exec Script Generator**: Instant generation of portable `.sh` container connection scripts with pre-flight CLI verification and `/bin/bash` -> `/bin/sh` fallback.
 
-### 🛠️ Management Features
-- **🚀 Bulk Operations**: Perform operations on multiple services simultaneously
-- **📈 Status Tracking**: Visual status indicators for services and deployments
-- **🔔 Error Handling**: Comprehensive error handling with user-friendly messages
-- **📱 Responsive UI**: Mobile-friendly interface with adaptive layouts
-- **🎨 Modern Design**: Clean, professional interface using shadcn/ui components
+## 🛠️ Tech Stack
 
-### 🔒 Security Features
-- **🔐 Secure Credentials**: Environment variable-based AWS credential management
-- **🛡️ Error Boundaries**: Graceful error handling and recovery
-- **🔍 Input Validation**: Proper validation for all user inputs and API calls
-- **🚫 Rate Limiting**: Protection against bruteforce attacks and API abuse
-- **⏱️ Time Range Validation**: Prevents resource exhaustion from large queries
-- **✅ Cluster Whitelist**: Only allowed clusters can be accessed
-- **🔒 Injection Protection**: Input sanitization against XSS and SQL injection
-
----
-
-## 🛠️ Technologies Used
-
-### Frontend
-- **[Next.js 14](https://nextjs.org/)** - React framework with App Router
-- **[TypeScript](https://www.typescriptlang.org/)** - Type-safe JavaScript
-- **[Tailwind CSS](https://tailwindcss.com/)** - Utility-first CSS framework
-- **[shadcn/ui](https://ui.shadcn.com/)** - Modern React component library
-- **[Lucide React](https://lucide.dev/)** - Beautiful & consistent icons
-
-### Backend & AWS
-- **[AWS SDK for JavaScript v3](https://aws.amazon.com/sdk-for-javascript/)** - AWS service integration
-- **[Amazon ECS](https://aws.amazon.com/ecs/)** - Container orchestration service
-- **Node.js Runtime** - Server-side JavaScript execution
-
-### Development Tools
-- **[ESLint](https://eslint.org/)** - Code linting and formatting
-- **[Prettier](https://prettier.io/)** - Code formatting
-- **[Git](https://git-scm.com/)** - Version control
-
----
+- **Framework**: SvelteKit 2 + Svelte 5 (runes: `$state`, `$derived`, `$props`, `$effect`)
+- **Runtime & Package Manager**: Bun
+- **Styling**: Tailwind CSS v4 + Tailwind Variants
+- **Component Primitives**: shadcn-svelte (bits-ui)
+- **Charts**: LayerCake (SVG renderer)
+- **Icons**: Lucide Svelte
+- **Theming**: mode-watcher
+- **AWS Integration**: AWS SDK for JavaScript v3 (ECS, CloudWatch, Secrets Manager)
+- **Deployment Adapter**: `@sveltejs/adapter-node`
 
 ## 📋 Prerequisites
 
-Before you begin, ensure you have the following installed:
+- **Bun**: v1.1.0 or higher
+- **AWS CLI**: configured with credentials or IAM role with permissions:
+  - `ecs:DescribeClusters`, `ecs:ListServices`, `ecs:DescribeServices`, `ecs:DescribeTaskDefinition`, `ecs:UpdateService`
+  - `cloudwatch:GetMetricStatistics`
+  - `secretsmanager:ListSecrets`, `secretsmanager:GetSecretValue`, `secretsmanager:CreateSecret`, `secretsmanager:PutSecretValue`, `secretsmanager:DeleteSecret`
 
-- **Node.js** (version 18.0 or higher)
-- **npm** or **yarn** package manager
-- **AWS CLI** configured with appropriate credentials
-- **Git** for version control
+## 🚀 Getting Started
 
-### AWS Requirements
-- AWS account with ECS access
-- IAM user/role with the following permissions:
-  - `ecs:DescribeClusters`
-  - `ecs:ListServices`
-  - `ecs:DescribeServices`
-  - `ecs:UpdateService`
-
----
-
-## 🚀 Installation
-
-### 1. Clone the Repository
+### 1. Install Dependencies
 
 ```bash
-git clone https://github.com/lutfi-zain/ecs-dashboard.git
-cd ecs-dashboard
+bun install
 ```
 
-### 2. Install Dependencies
+### 2. Configure AWS Environment
+
+Default region is `ap-southeast-3`. You can specify a custom region or credentials:
 
 ```bash
-npm install
-# or
-yarn install
+export AWS_REGION="ap-southeast-3"
+# Optional explicit credentials (falls back to AWS CLI credentials chain ~/.aws/credentials)
+export AWS_ACCESS_KEY_ID="your_access_key"
+export AWS_SECRET_ACCESS_KEY="your_secret_key"
 ```
 
-### 3. AWS Authentication (Choose One Method)
-
-The application supports multiple authentication methods:
-
-#### Option A: AWS CLI (Recommended)
-If you have AWS CLI configured, no additional setup needed:
-```bash
-aws configure
-```
-
-#### Option B: Environment Variables
-Create a `.env.local` file in the root directory:
-```env
-# AWS Configuration (Optional if using AWS CLI)
-AWS_ACCESS_KEY_ID=your_aws_access_key_id
-AWS_SECRET_ACCESS_KEY=your_aws_secret_access_key
-AWS_REGION=ap-southeast-1
-```
-
-#### Option C: IAM Roles
-When running on AWS infrastructure, IAM roles will be used automatically.
-
-### 4. Start Development Server
+### 3. Run Development Server
 
 ```bash
-npm run dev
-# or
-yarn dev
+bun run dev
 ```
 
-The application will be available at `http://localhost:3000`
+Dashboard will be live at `http://localhost:5173`.
 
----
+### 4. Build for Production
 
-## ⚙️ Configuration
+```bash
+bun run build
+bun run preview
+```
 
-### Environment Variables
+## 📁 Project Structure
 
-| Variable | Description | Required | Default |
-|----------|-------------|----------|---------|
-| `AWS_ACCESS_KEY_ID` | AWS access key ID | ❌* | Uses credential chain |
-| `AWS_SECRET_ACCESS_KEY` | AWS secret access key | ❌* | Uses credential chain |
-| `AWS_REGION` | AWS region | ❌ | `ap-southeast-1` |
+```text
+src/
+├── app.css                   # Tailwind v4 imports, stone palette custom properties
+├── app.d.ts                  # Global type declarations
+├── app.html                  # HTML template with Newsreader font preloads
+├── lib/
+│   ├── components/
+│   │   ├── cluster/          # ClusterStatCard, ClusterStatsOverview
+│   │   ├── layout/           # Sidebar, Header, AwsHealthBadge, ModeToggle
+│   │   ├── metrics/          # LayerCake AxisX, AxisY, AreaLine, ChartTooltip, MetricCard
+│   │   ├── secrets/          # SecretsTable, SecretViewDrawer, SecretCreateDialog
+│   │   ├── service/          # ServiceTable, ServiceTableRow, ForceDeployDialog, ShellConnectModal
+│   │   └── ui/               # shadcn-svelte components (button, card, dialog, table, etc.)
+│   ├── server/
+│   │   └── aws/              # AWS client singletons, ECS fetchers, rate limiting
+│   ├── types/                # Domain TypeScript models (ECS, Metrics, Secrets)
+│   └── utils.ts              # cn helper (clsx + tailwind-merge)
+└── routes/
+    ├── +layout.svelte        # App shell wrapper with sidebar, header, mode-watcher
+    ├── +layout.server.ts     # Global AWS health preflight check
+    ├── +page.svelte          # Main cluster dashboard page
+    ├── +page.server.ts       # SSR load function for clusters
+    ├── metrics/              # Telemetry explorer route
+    ├── secrets/              # Secrets Manager route
+    └── api/                  # SvelteKit +server.ts endpoints
+        ├── aws-health/
+        ├── ecs-status/
+        ├── ecs-services/
+        ├── ecs-force-update/
+        ├── ecs-metrics/
+        ├── ecs-metrics-range/
+        └── secrets-manager/
+```
 
-*Only required if not using AWS CLI or IAM roles
+## 🔒 Monitored Clusters
 
-### AWS Credential Chain
-
-The application follows AWS SDK credential precedence:
-1. **Environment Variables** - `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`
-2. **AWS CLI** - `~/.aws/credentials` and `~/.aws/config`
-3. **IAM Roles** - When running on AWS infrastructure
-4. **Instance Profiles** - For EC2 instances
-5. **Container Credentials** - For ECS tasks
-
-### Cluster Configuration
-
-By default, the application monitors these clusters:
+By default, the dashboard monitors these Kairos ECS clusters:
 - `kairos-pay-cluster-ecs-iac`
 - `kairos-his-cluster-ecs-iac`
 - `kairos-pas-cluster-ecs-iac`
-
-To modify the clusters, update the `clusterNames` array in `app/api/ecs-status/route.ts`:
-
-```typescript
-const clusterNames = [
-  "your-cluster-1",
-  "your-cluster-2",
-  "your-cluster-3"
-]
-```
-
----
-
-## 📖 Usage
-
-### 1. Dashboard Overview
-
-Upon loading, the dashboard displays:
-- **Cluster Cards**: Overview of each cluster's status and metrics
-- **AWS Health Status**: Connection status indicator
-- **Last Updated**: Timestamp of the most recent data refresh
-
-### 2. Cluster Selection
-
-- Click on any cluster card to select it
-- Use the dropdown menu for cluster selection
-- Selected cluster is highlighted with a blue border
-
-### 3. Service Management
-
-- View detailed service information in the table
-- Use checkboxes to select individual services
-- Use "Select All" to select all services in a cluster
-
-### 4. Force Updates
-
-1. Select one or more services using checkboxes
-2. Click the "Force Update" button
-3. Monitor the progress with loading indicators
-4. View results in the success/error messages
-
-### 5. Monitoring
-
-- Use the "Refresh" button to update data manually
-- Check AWS connection status with "Check AWS" button
-- Monitor real-time status changes and deployment progress
-
----
-
-## 🔌 API Endpoints
-
-### GET `/api/ecs-status`
-
-Retrieves status information for all configured ECS clusters.
-
-**Response:**
-```json
-[
-  {
-    "clusterName": "kairos-pay-cluster-ecs-iac",
-    "status": "ACTIVE",
-    "activeServicesCount": 5,
-    "runningTasksCount": 10,
-    "pendingTasksCount": 0,
-    "services": [
-      {
-        "serviceName": "my-service",
-        "status": "ACTIVE",
-        "runningCount": 2,
-        "desiredCount": 2,
-        "taskDefinition": "my-task:1"
-      }
-    ]
-  }
-]
-```
-
-### POST `/api/ecs-force-update`
-
-Triggers force deployment for selected services.
-
-**Request Body:**
-```json
-{
-  "clusterName": "kairos-pay-cluster-ecs-iac",
-  "serviceNames": ["service-1", "service-2"]
-}
-```
-
-**Response:**
-```json
-[
-  {
-    "serviceName": "service-1",
-    "success": true,
-    "message": "Force deployment initiated successfully"
-  }
-]
-```
-
-### GET `/api/aws-health`
-
-Checks AWS connection health and credentials.
-
-**Response:**
-```json
-{
-  "status": "healthy",
-  "message": "AWS connection successful",
-  "region": "ap-southeast-3",
-  "timestamp": "2024-01-15T10:30:00.000Z"
-}
-```
-
----
-
-## � Security
-
-The ECS Dashboard implements multiple security layers to protect against attacks and abuse.
-
-### Rate Limiting
-
-**Protection against bruteforce attacks:**
-- **Metrics API**: 10 requests per minute, 5-minute block after 3 violations
-- **Services API**: 20 requests per minute, 3-minute block after 3 violations
-- **IP-based tracking**: Combination of IP address and User-Agent
-- **Progressive blocking**: Automatic blocking after repeated violations
-
-**Example rate limit response:**
-```json
-{
-  "error": "Rate limit exceeded. Try again after [timestamp]",
-  "resetTime": 1699876543210
-}
-```
-
-### Input Validation
-
-**Protection against injection attacks:**
-- ✅ Cluster name whitelist validation
-- ✅ Service name pattern validation (max 255 chars)
-- ✅ Time range validation (max 30 days, within CloudWatch limits)
-- ✅ Suspicious pattern detection (HTML, JavaScript, SQL keywords)
-- ✅ Maximum input length enforcement
-
-### Security Best Practices
-
-1. **AWS Credentials**: Never commit credentials to version control
-2. **Environment Variables**: Use `.env.local` for sensitive data
-3. **HTTPS**: Always use HTTPS in production
-4. **IAM Permissions**: Follow principle of least privilege
-5. **Monitoring**: Regular review of rate limit violations
-
-### Testing Security
-
-Run the included security test script:
-```bash
-# PowerShell
-.\test-rate-limit.ps1
-```
-
-For detailed security documentation, see [SECURITY.md](SECURITY.md).
-
----
-
-## �📁 Project Structure
-
-```
-ecs-dashboard/
-├── app/
-│   ├── api/
-│   │   ├── aws-health/
-│   │   │   └── route.ts
-│   │   ├── ecs-force-update/
-│   │   │   └── route.ts
-│   │   └── ecs-status/
-│   │       └── route.ts
-│   ├── globals.css
-│   ├── layout.tsx
-│   └── page.tsx
-├── components/
-│   └── ui/
-│       ├── alert.tsx
-│       ├── badge.tsx
-│       ├── button.tsx
-│       ├── card.tsx
-│       ├── checkbox.tsx
-│       ├── select.tsx
-│       ├── skeleton.tsx
-│       └── table.tsx
-├── lib/
-│   ├── aws-config.ts
-│   └── utils.ts
-├── .env.local
-├── .gitignore
-├── next.config.js
-├── package.json
-├── README.md
-├── tailwind.config.js
-└── tsconfig.json
-```
-
----
-
-## 🤝 Contributing
-
-We welcome contributions to improve the ECS Dashboard! Here's how you can help:
-
-### Getting Started
-
-1. **Fork the repository**
-2. **Create a feature branch**: `git checkout -b feature/amazing-feature`
-3. **Make your changes**
-4. **Run tests**: `npm test`
-5. **Commit your changes**: `git commit -m 'Add amazing feature'`
-6. **Push to the branch**: `git push origin feature/amazing-feature`
-7. **Open a Pull Request**
-
-### Development Guidelines
-
-- Follow TypeScript best practices
-- Use meaningful commit messages
-- Add tests for new features
-- Update documentation as needed
-- Follow the existing code style
-
-### Code Style
-
-- Use TypeScript for all new code
-- Follow ESLint and Prettier configurations
-- Use meaningful variable and function names
-- Add comments for complex logic
-
-### Reporting Issues
-
-Please use the [GitHub Issues](https://github.com/lutfi-zain/ecs-dashboard/issues) page to report bugs or request features.
-
----
-
-## 🐛 Troubleshooting
-
-### Common Issues
-
-#### 1. AWS Credentials Error
-**Error**: `AWS credentials not configured properly`
-
-**Solution**:
-- **Using AWS CLI**: Run `aws configure` to set up credentials
-- **Using Environment Variables**: Verify `.env.local` file exists with correct credentials
-- **Check Configuration**: Run `aws configure list` to verify current setup
-- **Verify Permissions**: Ensure IAM user/role has required ECS permissions
-
-#### 2. Cluster Not Found
-**Error**: `Cluster not found in region`
-
-**Solution**:
-- Verify cluster names in the configuration
-- Check if clusters exist in the specified AWS region
-- Ensure proper ECS permissions
-
-#### 3. Runtime Error
-**Error**: `fs.readFile is not implemented yet!`
-
-**Solution**:
-- Ensure `export const runtime = "nodejs"` is added to API routes
-- Restart the development server
-
-#### 4. Connection Timeout
-**Error**: Connection timeout or network errors
-
-**Solution**:
-- Check internet connectivity
-- Verify AWS region is accessible
-- Check firewall settings
-
-### Debug Mode
-
-Enable debug logging by adding to `.env.local`:
-```env
-DEBUG=true
-NODE_ENV=development
-```
-
----
+- `kairos-fe-cluster-ecs-iac`
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-```
-MIT License
-
-Copyright (c) 2024 ECS Dashboard
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
-
----
-
-## 💬 Support
-
-### Getting Help
-
-- **Documentation**: Check this README and inline code comments
-- **Issues**: Report bugs on [GitHub Issues](https://github.com/lutfi-zain/ecs-dashboard/issues)
-- **Discussions**: Join discussions on [GitHub Discussions](https://github.com/lutfi-zain/ecs-dashboard/discussions)
-
-### Community
-
-- **GitHub**: [https://github.com/lutfi-zain/ecs-dashboard](https://github.com/lutfi-zain/ecs-dashboard)
-- **Issues**: [Report a bug or request a feature](https://github.com/lutfi-zain/ecs-dashboard/issues/new)
-
----
-
-## 🙏 Acknowledgments
-
-- **AWS SDK Team** for the excellent JavaScript SDK
-- **Next.js Team** for the amazing React framework
-- **shadcn** for the beautiful UI components
-- **Tailwind CSS** for the utility-first CSS framework
-- **Lucide** for the consistent icon set
-
----
-
-<div align="center">
-
-[![GitHub stars](https://img.shields.io/github/stars/lutfi-zain/ecs-dashboard?style=social)](https://github.com/lutfi-zain/ecs-dashboard/stargazers)
-[![GitHub forks](https://img.shields.io/github/forks/lutfi-zain/ecs-dashboard?style=social)](https://github.com/lutfi-zain/ecs-dashboard/network/members)
-
-</div>
+MIT License.
